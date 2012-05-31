@@ -1,0 +1,49 @@
+# Entities.Wallet.Card.dcm.yml
+Entities\Wallet\Card:
+    type: entity
+    table: card
+    id:
+        card_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        card_name:
+            type: string
+            length: 63
+        card_priority:
+            type: integer       
+        created_at:
+            type: datetime
+        modified_at:
+            type: datetime
+    manyToOne:
+        program:
+            targetEntity: Entities\Reward\Program
+            joinColumn:
+                name: card_programid
+                referencedColumnName: program_id
+        card_type:
+            targetEntity: CardType
+            joinColumn:
+                name: card_cardtypeid
+                referencedColumnName: cardtype_id
+        bank:
+            targetEntity: Entities\Finance\Bank
+            joinColumn:
+                name: card_bankid
+                referencedColumnName: bank_id
+        created_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: created_by
+                referencedColumnName: user_id
+        modified_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: modified_by
+                referencedColumnName: user_id
+    manyToMany:
+        wallets:
+            targetEntity: Wallet
+            mappedBy: cards

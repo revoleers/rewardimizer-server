@@ -1,0 +1,19 @@
+# Entities.Reward.Program.dcm.yml
+Entities\Reward\Program:
+    type: entity
+    table: program
+    id:
+        program_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        program_name:
+            type: string
+            length: 31
+        program_desc:
+            type: text
+    oneToMany:
+        cards:
+            targetEntity: Entities\Wallet\Card
+            mappedBy: program

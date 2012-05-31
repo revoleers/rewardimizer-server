@@ -1,0 +1,5 @@
+<?php
+class Kevlar_Auth_Strategy_Email extends Kevlar_Auth_Strategy_Abstract implements Kevlar_Auth_Strategy_Interface
+{
+  
+}

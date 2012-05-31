@@ -1,0 +1,221 @@
+<?php
+
+abstract class Revoleers_Validate_Doctrine_Abstract extends Zend_Validate_Db_Abstract
+{
+    /**
+     * @var string
+     */
+	
+    protected $_entity = '';
+    
+    /**
+     * @var Doctrine\ORM\Query
+     */
+    
+    protected $_query;
+    
+    /**
+     * @var Doctrine\ORM\EntityManager
+     */
+    
+    protected $_em;
+
+    /**
+     * Provides basic configuration for use with Zend_Validate_Doctrine Validators
+     * Setting $exclude allows a single record to be excluded from matching.
+     * Exclude can either be a String containing a where clause, or an array with `field` and `value` keys
+     * to define the where clause added to the sql.
+     * A database adapter may optionally be supplied to avoid using the registered default adapter.
+     *
+     * The following option keys are supported:
+     * 'entity'   => The database table / Doctrine Object to validate against
+     * 'field'   => The field to check for a match
+     * 'exclude' => An optional where clause or field/value pair to exclude from the query
+     * 'adapter' => An optional database adapter to use
+     *
+     * @param array|Zend_Config $options Options to use for this validator
+     */
+    public function __construct($options)
+    {
+        if ($options instanceof Doctrine\ORM\Query) {
+            $this->setQuery($options);
+            return;
+        }
+    	
+        if ($options instanceof Zend_Config) {
+            $options = $options->toArray();
+        } else if (func_num_args() > 1) {
+            $options       = func_get_args();
+            $temp['entity'] = array_shift($options);
+            $temp['field'] = array_shift($options);
+            if (!empty($options)) {
+                $temp['exclude'] = array_shift($options);
+            }
+
+            if (!empty($options)) {
+                $temp['em'] = array_shift($options);
+            }
+
+            $options = $temp;
+        }
+
+        if (!array_key_exists('entity', $options) && !array_key_exists('schema', $options)) {
+            require_once 'Zend/Validate/Exception.php';
+            throw new Zend_Validate_Exception('Entity or Schema option missing!');
+        }
+
+        if (!array_key_exists('field', $options)) {
+            require_once 'Zend/Validate/Exception.php';
+            throw new Zend_Validate_Exception('Field option missing!');
+        }
+
+        if (array_key_exists('em', $options)) {
+            $this->setEntityManager($options['em']);
+        }
+
+        if (array_key_exists('entity', $options)) {
+            $this->setEntity($options['entity']);
+        }
+
+        if (array_key_exists('exclude', $options)) {
+            $this->setExclude($options['exclude']);
+        }
+
+        $this->setField($options['field']);
+        if (array_key_exists('table', $options)) {
+            $this->setTable($options['table']);
+        }
+    }
+
+    /**
+     * Returns the set entity manager
+     *
+     * @return Doctrine\ORM\EntityManager
+     */
+    public function getEntityManager()
+    {
+        /**
+         * Check for an adapter being defined. if not, fetch the default adapter.
+         */
+        if ($this->_em === null) {
+            $this->_em = Zend_Controller_Front::getInstance()->getParam('bootstrap')->getResource('doctrine');
+            if (null === $this->_em) {
+                require_once 'Zend/Validate/Exception.php';
+                throw new Zend_Validate_Exception('No entity manager present');
+            }
+        }
+        return $this->_em;
+    }
+
+    /**
+     * Sets a new entity manager
+     *
+     * @param  Doctrine/ORM/EntityManager $em
+     * @return Revoleers_Validate_Doctrine_Abstract
+     */
+    public function setEntityManager($em)
+    {
+        if (!($em instanceof Doctrine/ORM/EntityManager)) {
+            require_once 'Zend/Validate/Exception.php';
+            throw new Zend_Validate_Exception('em option must be a Doctrine Entity Manager!');
+        }
+
+        $this->_em = $em;
+        return $this;
+    }
+
+    /**
+     * Returns the set entity
+     *
+     * @return string
+     */
+    public function getEntity()
+    {
+        return $this->_entity;
+    }
+
+    /**
+     * Sets a new entity
+     *
+     * @param string $table
+     * @return Revoleers_Validate_Doctrine_Abstract
+     */
+    public function setEntity($entity)
+    {
+        $this->_entity = (string) $entity;
+        return $this;
+    }
+    
+    /**
+     * Sets the Query object to be used by the validator
+     *
+     * @param Doctrine\ORM\Query $query
+     * @return Zend_Validate_Doctrine_Abstract
+     */
+    public function setQuery($query)
+    {
+        if (!$query instanceof Doctrine\ORM\Query) {
+            throw new Zend_Validate_Exception('Query option must be a valid ' .
+                                              'Doctrine\ORM\Query object');
+        }
+        $this->_query = $query;
+        return $this;
+    }
+
+    /**
+     * Gets the Doctrine Query object to be used by the validator.
+     * If no select object was supplied to the constructor,
+     * then it will auto-generate one from the given table,
+     * schema, field, and adapter options.
+     *
+     * @return Doctrine\ORM\Query The Query object which will be used
+     */
+    public function getQuery($value)
+    {
+        if (null === $this->_query) {
+        	$this->getEntityManager();
+            $qb = $this->_em->createQueryBuilder();
+            $qb->add('select', 'e')
+                ->add('from', $this->_entity . ' e');
+
+            $where = null;
+            if ($this->_exclude !== null) {
+                if (is_array($this->_exclude)) {
+                    $excludeClause = $qb->expr()->neq('e.' . $this->_exclude['field'], ':exclude');
+                    $qb->setParameter('exclude', $this->_exclude['value']);
+                } else {
+                    $excludeClause = $qb->expr()->neq($this->_exclude);
+                }
+                $qb->add('where', $qb->expr()->andx(
+                    $qb->expr()->eq('e.' . $this->_field, ':field'),
+                    $excludeClause
+                ));
+            } else {
+            	$qb->add('where', $qb->expr()->eq('e.' . $this->_field, ':field'));
+            }             
+            $qb->setParameter('field', $value);
+            $qb->setMaxResults(1);
+            
+            $this->_query = $qb->getQuery();
+        }
+        return $this->_query;
+    }
+
+    /**
+     * Run query and returns matches, or null if no matches are found.
+     *
+     * @param  String $value
+     * @return Array when matches are found.
+     */
+    protected function _query($value)
+    {
+        $query = $this->getQuery($value);
+        
+        /**
+         * Run query
+         */
+        $result = $query->getResult();
+
+        return $result;
+    }
+}

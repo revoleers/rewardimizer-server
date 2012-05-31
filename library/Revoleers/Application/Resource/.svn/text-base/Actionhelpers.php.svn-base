@@ -1,0 +1,11 @@
+<?php
+class Kevlar_Application_Resource_Actionhelpers extends Zend_Application_Resource_ResourceAbstract
+{
+    public function init()
+    {
+        $this->getBootstrap()->bootstrap('frontcontroller');
+        foreach ($this->getOptions() as $helper) {
+            Zend_Controller_Action_HelperBroker::getStaticHelper($helper);
+        } 
+    }
+}

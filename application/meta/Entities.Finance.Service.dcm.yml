@@ -1,0 +1,17 @@
+# Entities.Finance.Service.dcm.yml
+Entities\Finance\Service:
+    type: entity
+    table: service
+    id:
+        service_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        service_name:
+            type: string
+            length: 31
+    manyToMany:
+        banks:
+            targetEntity: Bank
+            mappedBy: service

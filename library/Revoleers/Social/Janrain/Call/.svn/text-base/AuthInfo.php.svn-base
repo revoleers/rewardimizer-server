@@ -1,0 +1,33 @@
+<?php
+
+class Kevlar_Social_Janrain_Call_AuthInfo extends Kevlar_Social_Janrain_Call_Abstract implements Kevlar_Social_Janrain_Call_Interface
+{
+	protected $_uri = "https://rpxnow.com/api/v2/auth_info";
+	
+	protected $_token;
+	
+	public function __construct($params) {
+		if (!isset($params['token'])) {
+			throw new Exception ('Token must be set for AuthInfo Call');
+		}
+		
+		$this->_token = $params['token'];
+	}
+	
+	public function getResponse()
+	{
+    	$client = new Zend_Http_Client($this->_uri);
+    	$client->setMethod(Zend_Http_Client::POST);
+    	$client->setParameterPost(array(
+    				'apiKey' => $this->getApiKey(),
+    				'token'  => $this->getToken()
+    	));
+    	
+    	return $client->request();
+	}
+	
+	public function getToken()
+	{
+		return $this->_token;
+	}
+}

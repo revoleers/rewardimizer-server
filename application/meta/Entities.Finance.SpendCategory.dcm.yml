@@ -1,0 +1,20 @@
+# Entities.Finance.SpendCategory.dcm.yml
+Entities\Finance\SpendCategory:
+    type: entity
+    table: spendcategory
+    id:
+        spendcategory_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        spendcategory_name:
+            type: string
+            length: 31
+        spendcategory_desc:
+            type: string
+            length: 31
+    oneToMany:
+        merchant_codes:
+            targetEntity: MerchantCode
+            mappedBy: spend_category

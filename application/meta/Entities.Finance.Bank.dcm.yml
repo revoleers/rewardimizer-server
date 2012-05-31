@@ -1,0 +1,28 @@
+# Entities.Finance.Bank.dcm.yml
+Entities\Finance\Bank:
+    type: entity
+    table: bank
+    id:
+        bank_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        bank_name:
+            type: string
+            length: 31
+    oneToMany:
+        cards:
+            targetEntity: Entities\Wallet\Card
+            mappedBy: bank
+    manyToMany:
+        services:
+            targetEntity: Service
+            joinTable:
+                name: bankservice
+                joinColumns:
+                    bankservice_bankid:
+                        referencedColumnName: bank_id
+                inverseJoinColumns:
+                    bankservice_serviceid:
+                        referencedColumnName: service_id

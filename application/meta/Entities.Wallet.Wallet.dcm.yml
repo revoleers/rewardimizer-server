@@ -1,0 +1,40 @@
+# Entities.Wallet.Wallet.dcm.yml
+Entities\Wallet\Wallet:
+    type: entity
+    table: wallet
+    id:
+        wallet_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:        
+        created_at:
+            type: datetime
+        modified_at:
+            type: datetime
+    oneToOne:
+        user:
+            targetEntity: Entities\User\User
+            mappedBy: contact
+    manyToOne:
+        created_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: created_by
+                referencedColumnName: user_id
+        modified_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: modified_by
+                referencedColumnName: user_id
+    manyToMany:
+        cards:
+            targetEntity: Card
+            joinTable:
+                name: walletcard
+                joinColumns:
+                    walletcard_walletid:
+                        referencedColumnName: wallet_id
+                inverseJoinColumns:
+                    walletcard_cardid:
+                        referencedColumnName: card_id

@@ -1,0 +1,158 @@
+<?php
+
+use Service\Doctrine;
+use Doctrine\DBAL;
+
+class Kevlar_Application_Resource_Doctrine extends \Zend_Application_Resource_ResourceAbstract
+{
+    private $_connectionOptions;
+    
+    private $_config;
+    private $_entityManager;
+    
+    
+    public function init() {
+        return $this->getEntityManager();
+    }
+    
+    public function getEntityManager() {
+        $options = $this->getOptions();
+        
+        if (null === $this->_entityManager) {
+            $config = $this->getConfig();
+            
+            if ( isset($options['autoGenerateProxyClasses']) )
+                $config->setAutoGenerateProxyClasses( (bool)$options['autoGenerateProxyClasses'] );
+                
+            if ( isset($options['sqlLogger']) && $options['sqlLogger'] != null) {
+                if ( !class_exists($options['sqlLogger']) )
+                    throw new Zend_Application_Resource_Exception("Sql logger class not found");
+                    
+                $config->setSQLLogger( new $options['sqlLogger']() );
+            }
+            
+            
+            $em = \Doctrine\ORM\EntityManager::create($this->_connectionOptions, $config );
+            $em->getEventManager()->addEventSubscriber(new \Doctrine\DBAL\Event\Listeners\MysqlSessionInit('utf8', 'utf8_unicode_ci')); 
+            $this->_entityManager = $em;
+        }
+        
+        if ( isset($options['isDefaultEntityManager']) && $options['isDefaultEntityManager'] == true )
+            \Service\Doctrine\Context::setDefaultEntityManager( $this->_entityManager );
+            
+        return $this->_entityManager;
+    }
+    
+    private function getConfig() {
+        if ( $this->_config == null ) {
+            $this->_config = new \Doctrine\ORM\Configuration();
+        }
+        
+        return $this->_config;
+    }
+        
+    /**
+     * Set up the metadata configuration
+     * 
+     * @param $value array
+     * @return void
+     */
+    public function setMetadata(array $value)
+    {
+        if (!isset($value['driver']) || !is_string($value['driver'])) {
+            throw new Zend_Application_Resource_Exception('No Valid Doctrine2 Metadata driver specified');
+        }
+        if (!isset($value['mappingDir']) || !is_string($value['mappingDir'])) {
+            throw new Zend_Application_Resource_Exception('Doctrine2 Metadata directory not set');
+        }
+        
+        switch ($value['driver']) {
+            case 'annotation':
+                $driver = \Doctrine\ORM\Mapping\Driver\AnnotationDriver::create($value['mappingDir']);
+                break;
+            case 'php':
+                $driver = new \Doctrine\ORM\Mapping\Driver\PhpDriver($value['mappingDir']);
+                break;
+            case 'xml':
+                $driver = new \Doctrine\ORM\Mapping\Driver\XmlDriver($value['mappingDir']);
+                break;
+            case 'yaml':
+                $driver = new \Doctrine\ORM\Mapping\Driver\YamlDriver($value['mappingDir']);
+                break;
+            default:
+                throw new Zend_Application_Resource_Exception('No valid driver found matching ' . $value['mappingDir']);
+        }
+        $this->_driver = $driver;
+        
+        $config = $this->getConfig();
+        $config->setMetadataDriverImpl( $driver );
+    }
+    
+    /**
+     * Set up the proxy from configuration
+     * 
+     * @param $value array
+     * @return void
+     */
+    public function setProxy(array $value)
+    {
+        if (!isset($value['dir']) || !is_string($value['dir'])) {
+            throw new Zend_Application_Resource_Exception('Proxy Directory not specified or invalid');
+        }
+        if (!isset($value['namespace']) || !is_string($value['namespace'])) {
+            throw new Zend_Application_Resource_Exception('Proxy Namespace not specified or invalid');
+        }
+        
+        $config = $this->getConfig();
+        $config->setProxyDir($value['dir']);
+        $config->setProxyNamespace($value['namespace']);
+    }
+    
+    /**
+     * Set up the connection configuration
+     * @param $value array
+     * @return void
+     */
+    public function setConnection(array $value)
+    {
+        if (!isset($value['driver']) || !is_string($value['driver'])) {
+            throw new Zend_Application_Resource_Exception('No valid Doctrine Connection Driver Specified');
+        }
+        
+        $this->_connectionOptions = $value;
+    }
+    
+    /**
+     * Set up the cache configuration
+     * @param $value array
+     * @return void
+     */
+    public function setCache($value = null)
+    {
+        $config = $this->getConfig();
+        if ( isset( $value['metadata'] ) && $value['metadata'] != null ) {
+            if ( !class_exists($value['metadata']) )
+                throw  new Zend_Application_Resource_Exception("Metadata cache class not found");
+                            
+            $config->setMetadataCacheImpl( new $value['metadata']() );
+        }
+        
+        if ( isset( $value['query'] ) && $value['query'] != null ) {
+            if ( !class_exists($value['query']) )
+                throw  new Zend_Application_Resource_Exception("Query cache class not found");
+                            
+            $config->setQueryCacheImpl( new $value['query']() );
+        }
+    }
+    
+    /**
+     * Set up custom types
+     * @param $value array
+     * @return void
+     */
+    public function setTypes($value = null) {
+        foreach ($value as $k => $v) {
+            \Doctrine\DBAL\Types\Type::addType($k, $v);
+        }       
+    }
+}

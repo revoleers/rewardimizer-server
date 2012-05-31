@@ -1,0 +1,11 @@
+<?php
+
+class Kevlar_Social_Janrain_Provider_LinkedIn extends Kevlar_Social_Janrain_Provider_Abstract implements Kevlar_Social_Janrain_Provider_Interface
+{
+    // LinkedIn doesn't return an email in the response
+    public function getEmail()
+    {
+    	$this->_email = '';
+        return $this->_email;
+    }
+}

@@ -1,0 +1,26 @@
+<?php
+class Kevlar_Validate_Company extends Zend_Validate_Abstract
+{
+    const MSG_INVALID_COMPANY = 'notValidCompany';
+    const MSG_DOUBLE_SPACE = 'doubleSpace';
+ 
+    protected $_messageTemplates = array(
+        self::MSG_INVALID_COMPANY => "Must contain only a-z, A-Z, 0 to 9, single quote, and these characters = _ ' . ~ ! @ # $ % & *.",
+        self::MSG_DOUBLE_SPACE => "Must not have two or more spaces together."
+        );
+ 
+    public function isValid($value)
+    {
+        $this->_setValue($value);
+ 		$isValid = true;  
+	    if (!Zend_Validate::is($value, 'Regex', array('/^[\sA-Za-z0-9-\'.~_=!@#\$%&\*]*$/'))) {
+            $this->_error(self::MSG_INVALID_COMPANY);
+            $isValid = false;
+		}
+		if (strstr($value,'  ')) {
+            $this->_error(self::MSG_DOUBLE_SPACE);
+            $isValid = false;
+		}
+        return $isValid;
+    }
+}

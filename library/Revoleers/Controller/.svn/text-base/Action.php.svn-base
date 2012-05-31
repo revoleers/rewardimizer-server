@@ -1,0 +1,445 @@
+<?php
+class Kevlar_Controller_Action extends Zend_Controller_Action
+{
+    
+    public $_aclDef = array();
+    public $_dependencies = array('doctrine', 'log');
+    
+    public $_acl;
+    
+    public $contexts = array();
+    
+    // the error page location
+    protected $_errorPage = array('module' => 'default', 
+                                  'controller' => 'error', 
+                                  'action' => 'denied');
+    
+    protected $_form;
+    protected $_model;
+    protected $_submodel;
+    protected $_module = 'user';
+    protected $_controller;
+    protected $_action = 'list';
+    protected $_params = array();
+    protected $_orderBy = null;
+    protected $_offset = null;
+    protected $_limit = null;
+    protected $_function;
+    protected $_function2;
+    
+    public function init()
+    {
+        $this->_helper->contextSwitch()->initContext();
+    }
+    
+    public function listAction()
+    {
+        $this->_getNotifications();
+        
+        $this->view->objs = $this->_model->fetchList($this->_params, $this->_orderBy, $this->_limit, $this->_offset);
+    }
+    
+    public function listSubobjectAction()
+    {
+    	$obj = null;
+    	
+        $this->_getNotifications();
+        
+        $request = $this->getRequest();       
+        $id = $request->getParam('objid');
+        if ($id) {
+            $obj = $this->_model->fetch($id);      
+        
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }       
+        }
+        
+        $fn = $this->_function;
+        
+        $this->view->objid = $id;
+        $this->view->parent = $obj;
+        $this->view->objs = $obj->$fn($this->_params);
+    }
+    
+    public function searchAction()
+    {
+    	$this->_getNotifications();
+    	
+    	$request = $this->getRequest();
+    	
+    	$objs = array();
+    	
+    	if ($request->isPost()) {
+    		if ($this->_form->isValid($request->getPost())) {
+		    	$keywords = trim($request->getParam('search'));
+		        $offset = $request->getParam('offset', Kevlar_Model_Abstract::OFFSET);
+		        $limit = $request->getParam('limit', Kevlar_Model_Abstract::LIMIT);
+		        $objs = $this->_model->query($keywords, $offset, $limit);        
+                $this->_form->populate(array('search' => $keywords, 'limit' => $limit, 'offset' => $offset));
+    		} else {
+                $this->view->err = "Please correct errors in the fields below.";
+            }
+    	}
+        
+        $this->view->objs = $objs;
+        $this->view->form = $this->_form;
+    }
+    
+    public function solrAction()
+    {
+    	$keywords = trim($this->getRequest()->getParam('search'));
+        
+        if ($keywords && $keywords != '') {
+            $this->view->results = $this->_model->solrQuery($keywords);
+            $this->_form->populate(array('search' => $keywords));
+        } else {
+            $this->view->results = Zend_Json::encode(array('responseHeader' => array('params' => array()),
+                                                           'response' => array('numFound' => 0, 'docs' => array())));
+        }        
+        
+        $this->view->form = $this->_form;
+    }
+    
+    public function viewAction()
+    {       
+        $this->_getNotifications();
+        
+        $request = $this->getRequest();        
+        $id = $request->getParam('id');
+        $obj = null;
+        
+        if ($id) {
+            $obj = $this->_model->fetch($id);      
+        
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }       
+        }
+        
+        $session = new Zend_Session_Namespace('object');
+        $session->id = $id;
+        $session->controller = $request->getControllerName();
+        
+        $this->view->obj = $obj;
+        $this->view->id = $id;
+    }
+    
+    public function saveAction()
+    {
+        $request = $this->getRequest();
+        
+        $id = $request->getParam('id');
+        if ($id) {
+            $obj = $this->_model->fetch($id);      
+            $this->view->obj = $obj;
+            
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }       
+        }
+        
+        if ($request->isPost()) {
+            if ($this->_form->isValid($request->getPost())) {
+                $this->_model->save($this->_form->getValues());
+                if ($this->_controller === null) {
+                	$this->_controller = $request->getControllerName();
+                }
+                $this->_helper->redirector($this->_action, $this->_controller, $this->_module, $this->_params);
+            } else {
+                $this->view->err = "Please correct errors in the fields below.";
+            }
+        }
+        
+        $this->_model->populateForm($this->_form);
+        $this->view->form = $this->_form;
+    }
+    
+    public function saveAjaxAction()
+    {
+        $request = $this->getRequest();
+        
+        $id = $request->getParam('id');
+        if ($id) {
+            $obj = $this->_model->fetch($id);      
+        
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }       
+        }
+        
+        if ($request->isPost()) {
+            if ($this->_form->isValid($request->getPost())) {
+                $this->_model->save($this->_form->getValues());
+                $this->view->status = "success";
+                $this->view->saved = $this->_model->toArray();
+            } else {
+                $this->view->err = "Please correct errors in the fields below.";
+            }
+        }
+    }
+    
+    public function saveSubobjectAction()
+    {
+        $request = $this->getRequest();       
+        
+        $obj = null;
+        $objid = $request->getParam('objid');
+        if ($objid) {
+            $obj = $this->_model->fetch($objid);      
+        
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }
+        }   
+        
+        if ($request->isPost()) {
+            if ($this->_form->isValid($request->getPost())) {
+                $this->_submodel->save($this->_form->getValues(), $obj);
+                $session = new Zend_Session_Namespace('object');
+                if (isset($session->id)) {
+                    $objid = $session->id;
+                    $this->_controller = $session->controller;
+                }
+                $this->_helper->redirector($this->_action, $this->_controller, $this->_module, array('id' => $objid));
+            } else {
+                $this->view->err = "Please correct errors in the fields below.";
+            }
+        }
+        
+        $this->_submodel->fetch($request->getParam('id'));
+        $this->_submodel->populateForm($this->_form, $obj);
+        
+        $this->view->form = $this->_form;
+    }
+    
+    public function saveSubobjectAjaxAction()
+    {
+        $request = $this->getRequest();       
+        
+        $obj = null;
+        $objid = $request->getParam('objid');
+        if ($objid) {
+            $obj = $this->_model->fetch($objid);      
+        
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }
+        }
+        
+        if ($request->isPost()) {
+            if ($this->_form->isValid($request->getPost())) {
+                $this->_submodel->save($this->_form->getValues(), $obj);
+                $this->view->status = 'success';
+                $this->view->saved = $this->_submodel->toArray();
+                $fn = $this->_function;
+                $this->_submodel->setObjList($obj->$fn($this->_params));
+                $this->_submodel->setParent($obj);
+                $this->view->objs = $this->_submodel->toArrayList();
+            } else {
+                $this->view->status = 'error';
+                $this->view->errors = $this->_form->getErrors();
+            }
+            $this->_form->getHashElement()->initCsrfToken();
+            $this->view->hash = $this->_form->getHashElement()->getValue();
+        }
+    }
+    
+    public function saveManyToManyAjaxAction()
+    {
+        $request = $this->getRequest();       
+        
+        $obj = null;
+        $objid = $request->getParam('objid');
+        if ($objid) {
+            $obj = $this->_model->fetch($objid);      
+        
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }
+        }
+        
+        $subobj = null;
+        $id = $request->getParam('id');
+        if ($id) {
+            $subobj = $this->_submodel->fetch($id);      
+        
+            if (null === $subobj) {
+                throw new Exception("Subobject not found");
+            }
+        }
+        
+        $result = $this->_model->addManyToMany($subobj, $this->_function, $this->_function2);
+        if ($result === true) {
+        	$this->view->status = 'success';
+        } else {
+        	$this->view->status = 'error';
+        }
+    }
+    
+    public function deleteManyToManyAjaxAction()
+    {
+        $request = $this->getRequest();       
+        
+        $obj = null;
+        $objid = $request->getParam('objid');
+        if ($objid) {
+            $obj = $this->_model->fetch($objid);      
+        
+            if (null === $obj) {
+                throw new Exception("Object not found");
+            }
+        }
+        
+        $subobj = null;
+        $id = $request->getParam('id');
+        if ($id) {
+            $subobj = $this->_submodel->fetch($id);      
+        
+            if (null === $subobj) {
+                throw new Exception("Subobject not found");
+            }
+        }
+        
+        $result = $this->_model->deleteManyToMany($subobj, $this->_function);
+        if ($result === true) {
+            $this->view->status = 'success';
+        } else {
+            $this->view->status = 'error';
+        }
+    }
+    
+    public function deactivateAction()
+    {       
+        $request = $this->getRequest();        
+        $id = $request->getParam('id');
+        if ($id) {
+            $result = $this->_model->deactivate($id);       
+        } else {
+            $this->view->err = 'ID parameter not found';
+        }
+        
+        $notification = new Zend_Session_Namespace('notification');
+        $notification->success = 'Deactivation successful';
+        
+        $this->_helper->redirector($this->_action, $this->_controller, $this->_module, $this->_params);
+    }
+    
+    public function activateAction()
+    {       
+        $request = $this->getRequest();        
+        $id = $request->getParam('id');
+        if ($id) {
+            $result = $this->_model->activate($id);       
+        } else {
+            $this->view->err = 'ID parameter not found';
+        }        
+        
+        $notification = new Zend_Session_Namespace('notification');
+        $notification->success = 'Activation successful';
+        
+        $this->_helper->redirector($this->_action, $this->_controller, $this->_module, $this->_params);
+    }
+    
+    public function deleteAction()
+    {       
+        $request = $this->getRequest();        
+        $id = $request->getParam('id');
+        if ($id) {
+            $result = $this->_model->delete($id);       
+        } else {
+            $this->view->err = 'ID parameter not found';
+        }
+        
+        $notification = new Zend_Session_Namespace('notification');
+        $notification->success = 'Delete successful';
+        
+        $this->_helper->redirector($this->_action, $this->_controller, $this->_module, $this->_params);
+    }
+    
+    public function deleteAjaxAction()
+    {
+        $request = $this->getRequest();        
+        $id = $request->getParam('id');
+        if ($id) {
+            $result = $this->_model->delete($id);
+            $this->view->status = 'success';     
+        } else {
+            $this->view->status = 'error';
+        }
+    }
+    
+    protected function _getNotifications()
+    {
+        $notification = new Zend_Session_Namespace('notification');
+        if (isset($notification->error)) {
+            $this->view->err = $notification->error;
+        }
+    
+        if (isset($notification->success)) {
+            $this->view->success = $notification->success;
+        }
+    
+        if (isset($notification->information)) {
+            $this->view->information = $notification->information;
+        }
+        
+        Zend_Session::namespaceUnset('notification');
+    }
+
+    protected function _log($logMessage, $logType = Zend_Log::INFO)
+    {
+        if (isset($this->log)) {
+            $this->log->log($logMessage, $logType);
+        }
+    }
+    
+    protected function _prepareErrMessage($ex)
+    {
+        return array('An unexpected error occurred: ' . $ex->getMessage());
+    }
+
+    protected $_bootstrap;
+    protected function initBootstrap() {
+        if (!$this->_bootstrap) {
+            // from outside a controller, use Zend_Controller_Front::getInstance()->getParam('bootstrap');
+            $this->_bootstrap = $this->getInvokeArg('bootstrap');
+        }
+        return $this->_bootstrap;
+    }
+    
+    /**
+     * Deny Access Function
+     * Redirects to errorPage, this can be called from an action using the action helper
+     *
+     * @param request
+     *
+     * @return void
+     **/
+    public function denyAccess($request)
+    {
+        if (!isset($_SESSION["Zend_Auth"]["storage"]->user_id)) {
+            // If session has expired, save previous request in the session and send user to login page.
+            $session = new Zend_Session_Namespace('login');
+            $session->notify = 'This action requires you to login before you can continue';
+            $session->prevRequest = $request;
+            $this->_helper->redirector('login','index','default');
+        } else {
+            // Otherwise tell user they are not authorized.
+            $this->_helper->redirector($this->_errorPage['action'], $this->_errorPage['controller'], $this->_errorPage['module'],
+                                    array('prevaction' => $request->getActionName(),
+                                          'prevcontroller' => $request->getControllerName(),
+                                          'prevmodule' => $request->getModuleName()));
+        }
+    }
+    
+    protected function _getForm($action)
+    {
+        throw new Exception("_getForm must be implemented in your Controller");
+    }
+    
+    protected function _getModel($action, $clean = false)
+    {
+        throw new Exception("_getModel must be implemented in your Controller");
+    }
+}

@@ -1,0 +1,58 @@
+# Entities.User.User.dcm.yml
+Entities\User\User:
+    type: entity
+    table: user
+    id:
+        user_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        user_firstname:
+            type: string
+            length: 63
+            nullable: true
+        user_lastname:
+            type: string
+            length: 63
+            nullable: true
+        user_middlename:
+            type: string
+            length: 63
+            nullable: true
+        user_email:
+            type: string
+            length: 63
+        user_agreeterms:
+            type: boolean
+        user_admin:
+            type: boolean
+        status:
+            type: boolean
+        deleted:
+            type: boolean
+        created_at:
+            type: datetime
+        modified_at:
+            type: datetime
+    oneToOne:
+        wallet:
+            targetEntity: Entities\Wallet\Wallet
+            joinColumn:
+                name: user_walletid
+                referencedColumnName: wallet_id
+    oneToMany:
+        socialsignons:
+            targetEntity: SocialSignon
+            mappedBy: user
+    manyToOne:
+        created_by:
+            targetEntity: User
+            joinColumn:
+                name: created_by
+                referencedColumnName: user_id
+        modified_by:
+            targetEntity: User
+            joinColumn:
+                name: modified_by
+                referencedColumnName: user_id

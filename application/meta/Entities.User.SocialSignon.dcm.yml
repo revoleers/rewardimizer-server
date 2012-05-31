@@ -1,0 +1,34 @@
+# Entities.User.SocialSignon.dcm.yml
+Entities\User\SocialSignon:
+    type: entity
+    table: socialsignon
+    id:
+        socialsignon_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        socialsignon_identifier:
+            type: string
+            length: 127
+        created_at:
+            type: datetime
+        modified_at:
+            type: datetime
+    manyToOne:
+        user:
+            targetEntity: User
+            joinColumn:
+                name: socialsignon_userid
+                referencedColumnName: user_id
+        created_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: created_by
+                referencedColumnName: user_id
+        modified_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: modified_by
+                referencedColumnName: user_id
+                

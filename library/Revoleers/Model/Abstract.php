@@ -1,0 +1,219 @@
+<?php
+
+abstract class Revoleers_Model_Abstract {
+    protected $_em = null;
+    protected $_logger = null;
+    
+    protected $_obj;
+    protected $_objList;
+    protected $_parent;
+    protected $_entityName;
+    
+    protected $_solr = null;
+    
+    const OFFSET = 0;
+    const LIMIT = 25;
+    
+    public function __construct($em, $logger = null, $solr = null) {
+        if ($this->_entityName === null) {
+            throw new Exception ('You must specify a Doctrine Entity name in your model');
+        }
+        
+        $this->_em = $em;
+        $this->_logger = $logger;
+        $config = new Zend_Config_Ini(APPLICATION_PATH . '/configs/application.ini', APPLICATION_ENV);
+        $this->_solr = $solr . $config->solr->suffix;
+    }
+    
+    public function fetch($id = null)
+    {
+        $this->_log('fetch entity: ' . $this->_entityName . ' id: ' . $id, Zend_Log::DEBUG);
+        if (null === $this->_obj) {
+            $this->_obj = $this->_em->find($this->_entityName, $id);
+        }
+        return $this->_obj;
+    }   
+    
+    public function fetchOne (array $params = array())
+    {
+        $this->_log('fetchOne entity: ' . $this->_entityName . ' params: ' . implode(',', $params), Zend_Log::DEBUG);
+        return $this->_em
+                       ->getRepository($this->_entityName)
+                       ->findOneBy($params);
+    }
+    
+    public function fetchList(array $params = array(), $orderBy = null, $limit = null, $offset = null)
+    {
+        $this->_log('fetchList entity: ' . $this->_entityName . ' params: ' . implode(',', $params), Zend_Log::DEBUG);
+        return $this->_em
+                       ->getRepository($this->_entityName)
+                       ->findBy($params, $orderBy, $limit, $offset);
+    }
+    
+    public function query($keyword, $offset = 0, $limit = 25, $orderBy = array())
+    {
+    	$qb = $this->_buildQuery($keyword);
+        
+        foreach ($orderBy as $column => $dir) {
+            $qb->orderBy($column, $dir);
+        }
+           
+        if ($offset > 0) {
+            $qb->setFirstResult($offset);
+        }
+        if ($limit > 0) {
+            $qb->setMaxResults($limit);
+        }
+        
+        $query = $qb->getQuery();
+        
+        return $query->getResult();
+    }
+    
+    protected function _buildQuery($keyword)
+    {
+    	throw new Exception('Method not implemented yet');
+    }
+        
+    public function delete ($id) {      
+        $this->_log('delete entity: ' . $this->_entityName . ' id: ' . $id, Zend_Log::DEBUG);
+        $this->fetch($id);
+        if (null === $this->_obj) {
+            throw new Exception('Object ' . $this->_entityName . ' to be deleted not found');
+        }
+        $this->_em->remove($this->_obj);
+        $this->_em->flush();
+        
+        return true;
+    }
+    
+    /**
+     * 
+     * Delete an object's many to many relationship with another object
+     * 
+     * @param $subobj the subobject to delete from the object
+     * @param $fn the function to get the list of elements
+     */
+    public function deleteManyToMany($subobj, $fn) {
+    	$this->_log('delete subobject entity: ' . $this->_entityName, Zend_Log::DEBUG);
+    	$this->_obj->$fn()->removeElement($subobj);
+    	$this->_em->flush();
+    	
+    	return true;
+    }
+    
+    /**
+     * 
+     * Function to add a many to many relationship between objects ...
+     * 
+     * @param $subobj the object being added to the main model object ($this->_obj)
+     * @param $fn1 the function to add the subobject to the main model object
+     * @param $fn2 the function to add the main model object to the subobject
+     */
+    public function addManyToMany($subobj, $fn1, $fn2)
+    {
+    	$this->_obj->$fn1($subobj);
+    	$subobj->$fn2($this->_obj);
+    	$this->_em->persist($this->_obj);
+    	$this->_em->persist($subobj);
+    	
+    	$this->_em->flush();
+    	
+    	return true;
+    }
+    
+    public function deactivate ($id)
+    {
+        throw new Exception('Method not implemented yet');
+    }
+    
+    public function activate ($id)
+    {
+        throw new Exception('Method not implemented yet');
+    }
+    
+    public function save (array $data, $parentobj = null)
+    {
+        throw new Exception('Method not implemented yet');
+    }
+    
+    public function copy ($id)
+    {
+        throw new Exception('Method not implemented yet');
+    }
+    
+    public function toArray ()
+    {
+        throw new Exception('Method not implemented yet');
+    }
+    
+    public function toJson ()
+    {
+        return Zend_Json::encode($this->toArray());
+    }
+    
+    public function toArrayList (array $params = array(), $orderBy = null, $limit = null, $offset = null, $includeLink = true)
+    {
+        throw new Exception('Method not implemented yet');
+    }
+    
+    public function toJsonList (array $params = array(), $orderBy = null, $limit = null, $offset = null, $includeLink = true)
+    {
+        return Zend_Json::encode($this->toArrayList($params, $orderBy, $limit, $offset, $includeLink));
+    }
+    
+    protected function _getSolr()
+    {
+    	if ($this->_solr === null) {
+    		throw new Exception('Solr location not specified, make sure you specify it in your constructor');
+    	}
+    	
+    	return $this->_solr;
+    }
+    
+    public function setSolr($solr)
+    {
+    	$this->_solr = $solr;
+    }
+    
+    public function solrQuery($query, $offset = 0, $limit = 10, $params = array('wt' => 'json'), $method = Apache_Solr_Service::METHOD_GET)
+    {
+    	$transportInstance = new Apache_Solr_HttpTransport_CurlNoReuse();
+    	$config = new Zend_Config_Ini(APPLICATION_PATH . '/configs/application.ini', APPLICATION_ENV);
+        $solr = new Apache_Solr_Service($config->solr->server, $config->solr->port, $this->_getSolr(), $transportInstance);
+        
+        // if magic quotes is enabled then stripslashes will be needed
+        if (get_magic_quotes_gpc() == 1) {
+        	$query = stripslashes($query);
+        }        
+        
+        $response = $solr->search($query, $offset, $limit, $params, $method);
+        return $response->getRawResponse();
+    }
+    
+    public function setObj ($obj)
+    {
+        $this->_obj = $obj;
+    }
+    
+    public function setObjList ($objs)
+    {
+        $this->_objList = $objs;
+    }
+    
+    public function setParent ($parent)
+    {
+        $this->_parent = $parent;
+    }
+    
+    protected function _getLogger() {
+        return $this->_logger;
+    }
+
+    protected function _log($logMessage, $logType = Zend_Log::INFO)
+    {
+        if ($this->_getLogger()) {
+            $this->_logger->log($logMessage, $logType);
+        }
+    }
+}

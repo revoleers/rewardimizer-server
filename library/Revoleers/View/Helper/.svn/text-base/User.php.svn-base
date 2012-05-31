@@ -1,0 +1,44 @@
+<?php
+
+class Kevlar_View_Helper_User extends Zend_View_Helper_Abstract
+{
+    /*
+     * Email =  email
+     * First name = firstname
+     * Last name = lastname
+     * User ID = id
+     * Profile ID = profileid
+     * Role = role
+     * URL for Backplane integration
+     */
+	
+    public function user($value)
+    {
+        $role = 'guest';
+        if (Zend_Auth::getInstance()->hasIdentity()) {
+            $user = Zend_Auth::getInstance()->getIdentity();
+            ($user->user_admin === true) ? $role = 'admin' : $role = 'user';
+        } else {
+            return false;	
+        }
+        
+        switch ($value) {
+        	case 'role':
+        		return $role;
+        	case 'email':
+        		return $user->useremail_email;
+        	case 'firstname':
+        		return $user->user_firstname;
+            case 'lastname':
+                return $user->user_lastname;
+            case 'id':
+                return $user->user_id;
+            case 'profileid':
+                return $user->profile_id;
+            case 'backplane':
+                return $user->backplane;
+            default:
+            	throw new Exception('Only role, email, firstname, lastname, id, profileid, and Backplane are valid values for Kevlar_View_Helper_User');
+        }
+    }
+}

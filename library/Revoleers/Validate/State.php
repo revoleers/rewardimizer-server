@@ -1,0 +1,26 @@
+<?php
+class Revoleers_Validate_State extends Zend_Validate_Abstract
+{
+    const MSG_INVALID_STATE = 'notValidState';
+    const MSG_DOUBLE_SPACE = 'doubleSpace';
+ 
+    protected $_messageTemplates = array(
+        self::MSG_INVALID_STATE => "Must contain only a-z, A-Z, single quote, dash or space characters.",
+        self::MSG_DOUBLE_SPACE => "Must not have two or more spaces together."
+        );
+ 
+    public function isValid($value)
+    {
+        $this->_setValue($value);
+ 		$isValid = true;
+	    if (!Zend_Validate::is($value, 'Regex', array('/^[\sA-Za-z-\']*$/'))) {
+            $this->_error(self::MSG_INVALID_STATE);
+            $isValid = false;
+		}
+		if (strstr($value,'  ')) {
+            $this->_error(self::MSG_DOUBLE_SPACE);
+            $isValid = false;
+		}
+        return $isValid;
+    }
+}

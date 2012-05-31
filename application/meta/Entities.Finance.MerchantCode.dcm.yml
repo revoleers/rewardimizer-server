@@ -1,0 +1,30 @@
+# Entities.Finance.MerchantCode.dcm.yml
+Entities\Finance\MerchantCode:
+    type: entity
+    table: merchantcode
+    id:
+        merchantcode_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:        
+        merchantcode_code:
+            type: integer
+        merchantcode_name:
+            type: string
+            length: 31
+    oneToMany:
+        purchases:
+            targetEntity: Purchase
+            mappedBy: merchantcode
+    manyToOne:
+        spend_category:
+            targetEntity: SpendCategory
+            joinColumn:
+                name: merchantcode_spendcategoryid
+                referencedColumnName: spendcategory_id
+        place_type:
+            targetEntity: Entities\Google\PlaceType
+            joinColumn:
+                name: merchantcode_googleplacetypeid
+                referencedColumnName: googleplacetype_id

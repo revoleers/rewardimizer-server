@@ -1,0 +1,35 @@
+<?php
+class Kevlar_Application_Resource_View extends Zend_Application_Resource_ResourceAbstract
+{
+    public function init()
+    {
+		$view = new Zend_View($this->getOptions());
+        
+        $view->addScriptPath(APPLICATION_PATH . '/scripts');
+
+        $viewRenderer = Zend_Controller_Action_HelperBroker::getStaticHelper(
+            'ViewRenderer'
+        );
+        $viewRenderer->setView($view);
+        
+        $view->headMeta()->appendHttpEquiv('Content-Type', 'text/html; charset=UTF-8')
+                         ->appendHttpEquiv('X-UA-Compatible', 'IE=EmulateIE7')
+                         ->appendName('viewport', 'width=device-width; initial-scale=1.0;')
+                         ->appendName('viewport', 'user-scalable=no, width=device-width, initial-scale=1.0, maximum-scale=1.0');
+                         
+        $view->headLink(array('rel' => 'shortcut bookmark icon', 'type' => 'image/x-icon', 'href' => '/branding/images/shared/pathbuilder.ico', 'PREPEND'))
+                              ->appendStylesheet('/resources/css/reset.css')
+                              ->appendStylesheet('/resources/css/base.css')
+                              ->appendStylesheet('/branding/css/global.css');
+
+        $view->headScript()->appendFile('/lib/core/jquery.min.js')
+                           ->appendFile('/lib/core/base.js')
+                           ->appendFile('/lib/core/templates.js')
+                           ->appendFile('/lib/i10n/en.js');
+        
+        require_once 'default/forms/SearchHeader.php';
+        $view->searchform = new Default_Form_SearchHeader();
+        
+        return $view;
+    }
+}

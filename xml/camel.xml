@@ -1,0 +1,114 @@
+ <!--
+    Licensed to the Apache Software Foundation (ASF) under one or more
+    contributor license agreements.  See the NOTICE file distributed with
+    this work for additional information regarding copyright ownership.
+    The ASF licenses this file to You under the Apache License, Version 2.0
+    (the "License"); you may not use this file except in compliance with
+    the License.  You may obtain a copy of the License at
+   
+    http://www.apache.org/licenses/LICENSE-2.0
+   
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!-- 
+
+    Lets deploy some Enterprise Integration Patterns inside the ActiveMQ Message Broker
+    For more information, see:
+    
+    http://camel.apache.org
+    
+    Include this file in your configuration to enable Camel
+    
+    e.g. <import resource="camel.xml"/>
+    
+    Note: this configuration is already included in a default configuration via Camel Web Console.
+    See ${ACTIVEMQ_HOME}/conf/jetty.xml for more info on how to disable it, in case you want to do so.
+    Also check ${ACTIVEMQ_HOME}/webapps/camel/WEB-INF/application-context.xml to see how this config is included in Camel Web Console
+    
+    
+-->
+<beans
+   xmlns="http://www.springframework.org/schema/beans"  
+   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+   xsi:schemaLocation="http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+   http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+  
+  	<camelContext id="camel" errorHandlerRef="dlc" xmlns="http://camel.apache.org/schema/spring">
+        <route>
+            <description>Dev Email Routing</description>
+            <from uri="activemq:email.dev"/>
+            <setBody id="setBody2">
+                <simple>name=${body}</simple>
+            </setBody>
+            <setHeader headerName="Content-Type" id="setHeader3">
+                <constant>application/x-www-form-urlencoded;</constant>
+            </setHeader>
+		    <setHeader headerName="CamelHttpMethod" id="setHeader4">
+		        <constant>POST</constant>
+		    </setHeader>            
+            <to uri="http://reward.localhost/mail/index/receive"/>
+            <setExchangePattern pattern="InOnly"/> 
+        </route>
+        <route>
+            <description>Stage Routing</description>
+            <from uri="activemq:email.beta"/>
+            <setBody id="setBody3">
+                <simple>name=${body}</simple>
+            </setBody>
+            <setHeader headerName="Content-Type" id="setHeader5">
+                <constant>application/x-www-form-urlencoded;</constant>
+            </setHeader>
+            <setHeader headerName="CamelHttpMethod" id="setHeader6">
+                <constant>POST</constant>
+            </setHeader>            
+            <to uri="http://184.73.119.46/mail/index/receive"/>
+            <setExchangePattern pattern="InOnly"/> 
+        </route>
+        <route>
+            <description>Prod Routing</description>
+            <from uri="activemq:email.prod"/>
+            <setBody id="setBody4">
+                <simple>name=${body}</simple>
+            </setBody>
+            <setHeader headerName="Content-Type" id="setHeader7">
+                <constant>application/x-www-form-urlencoded;</constant>
+            </setHeader>
+            <setHeader headerName="CamelHttpMethod" id="setHeader8">
+                <constant>POST</constant>
+            </setHeader>            
+            <to uri="http://reward.revoleers.com/mail/index/receive"/>
+            <setExchangePattern pattern="InOnly"/> 
+        </route>
+    </camelContext>
+
+    <!-- configure the camel activemq component to use the current broker -->
+    <bean id="activemq" class="org.apache.activemq.camel.component.ActiveMQComponent" >
+        <property name="connectionFactory">
+          <bean class="org.apache.activemq.ActiveMQConnectionFactory">
+            <property name="brokerURL" value="vm://localhost?broker.persistent=false" />
+            <property name="userName" value="${activemq.username}"/>
+            <property name="password" value="${activemq.password}"/>
+          </bean>
+        </property>
+    </bean>
+    
+      <!-- here we configure our DeadLetterChannel -->
+    <bean id="dlc" class="org.apache.camel.builder.DeadLetterChannelBuilder">
+	    <!-- exchanges is routed to email.dead in cased redelivery failed -->
+	    <property name="deadLetterUri" value="activemq:email.dead"/>
+	    <!-- reference the redelivery policy to use -->
+	    <property name="redeliveryPolicy" ref="rpc"/>
+    </bean>
+
+   <!-- here we set the redelivery settings -->
+    <bean id="rpc" class="org.apache.camel.processor.RedeliveryPolicy">
+	    <!-- try redelivery at most 3 times, after that the exchange is dead and its routed to the email.dead endpoint -->
+        <property name="maximumRedeliveries" value="3"/>
+	    <!-- delay 250ms before redelivery -->
+	    <property name="redeliveryDelay" value="250"/>
+    </bean>
+</beans>

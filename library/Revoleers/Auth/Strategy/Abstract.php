@@ -1,0 +1,93 @@
+<?php
+
+class Revoleers_Auth_Strategy_Abstract
+{
+  protected $_adapter;
+  protected $_form;
+
+  public function setAdapter(Revoleers_Auth_Adapter_Multipath $adapter)
+  {
+    $this->_adapter = $adapter;
+    return $this;
+  }
+
+  public function getForm()
+  {
+    if ($this->_form === null) {
+        //Include the form
+        require_once 'default/forms/Login.php';
+        $this->_form =  new Default_Form_Login();
+    }
+    
+    return $this->_form;
+  }
+  
+  public function setForm($form)
+  {
+    $this->_form = $form;
+  }
+
+  public function shouldAuthenticate()
+  {
+    return $this->_adapter->getRequest()->isPost();
+  }
+
+  public function authenticate()
+  {
+  	// clear any lingering session identities  	
+    Zend_Auth::getInstance()->clearIdentity();
+    $session = $this->initBootstrap()->getApplication()->getOption('session');
+    
+    $userModel = $this->_adapter->getUser();
+    
+    if (null === $userModel->user_email || null === $userModel->user_password) {
+        throw new Zend_Auth_Adapter_Exception('must provide email and password');
+    }
+
+    
+    if ($useremail = ($userModel->authenticate($userModel->user_email, $userModel->user_password))) {
+        $user = new stdClass();
+        $user->useremail_email = $useremail->getUseremailEmail();
+        $user->user_id = $useremail->getUser()->getUserId();
+        $user->user_firstname = $useremail->getUser()->getUserFirstname();
+        $user->user_lastname = $useremail->getUser()->getUserLastname();
+        $user->user_admin = $useremail->getUser()->getUserAdmin();
+        $user->profile_id = $useremail->getUser()->getProfile()->getProfileId();
+        Zend_Session::setOptions($session);
+        $auth = Zend_Auth::getInstance();
+        $storage = $auth->getStorage();
+        $storage->write($user);
+        $user = $auth->getIdentity();
+        
+        return new Zend_Auth_Result(
+            Zend_Auth_Result::SUCCESS,
+            $user,
+            array('Authentication successful')
+            );
+
+    } else {
+        throw new Zend_Auth_Adapter_Exception('Authentication failed');
+    }
+  }
+
+    protected $_logger;
+
+  
+    function log($logMessage, $logType = Zend_Log::INFO)
+    {
+        if (null === $this->_logger) {
+            $bootstrap = $this->initBootstrap();
+            $this->_logger =  $bootstrap->getResource('log');
+        }
+        $this->_logger->log($logMessage, $logType);
+    }
+    
+    protected $_bootstrap;
+    protected function initBootstrap() {
+        if (!$this->_bootstrap) {
+            // from outside a controller, use Zend_Controller_Front::getInstance()->getParam('bootstrap');
+            $this->_bootstrap = Zend_Controller_Front::getInstance()->getParam('bootstrap');
+        }
+        return $this->_bootstrap;
+    }
+}

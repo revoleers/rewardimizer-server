@@ -1,0 +1,75 @@
+<?php
+
+class Kevlar_Mail
+{
+    protected $_logger = null;
+    
+    public function __construct($logger = null) {   
+        $this->_logger = $logger;
+    }
+    
+	public function send($template)
+	{
+		$config = new Zend_Config_Ini(APPLICATION_PATH . '/configs/application.ini', APPLICATION_ENV);
+                
+        $queue = new Zend_Queue('Activemq', $config->queue->activemq->toArray());
+        
+        $data = array();
+        $data['RecipientEmail'] = $template->getRecipientEmail();
+        $data['RecipientName'] = $template->getRecipientName();
+        $data['From'] = $template->getFrom();
+        $data['Subject'] = $template->getSubject();
+        $data['BodyText'] = $template->getBodyText();
+        $data['BodyHtml'] = $template->getBodyHtml();
+
+        $data['SenderEmail'] = $template->getSenderEmail();
+        $data['SenderName'] = $template->getSenderName();
+ 
+        $message = $queue->send(serialize($data));
+	}
+	
+	public function receive($message, $config)
+	{                
+        $queue = new Zend_Queue('Activemq', $config->queue->activemq->toArray());
+        
+        $email = $config->queue->email;
+        $options = $email->options->toArray();
+        
+        $transport = new Zend_Mail_Transport_Smtp($email->server, $options);
+        Zend_Mail::setDefaultTransport($transport);
+        
+        $array = unserialize($message);
+        Zend_Debug::dump($array);
+        
+        $mail = new Zend_Mail();
+        $mail->setFrom($array['SenderEmail'], $array['SenderName'])
+                   ->setSubject($array['Subject'])
+                   ->setBodyText($array['BodyText'])
+                   ->setBodyHtml($array['BodyHtml']);
+                   
+        $toEmailArr = explode(';', $array['RecipientEmail']);
+        $toNameArr = explode(';', $array['RecipientName']);
+        
+        $i = 0;
+        foreach ($toEmailArr as $email) {
+            if ($email != '') {
+                $name = (isset($toNameArr[$i])) ? $toNameArr[$i] : '';
+                $mail->addTo($email, $name);
+            }
+            $i++;
+        }
+                   
+        $mail->send();
+	}
+	
+    protected function _getLogger() {
+        return $this->_logger;
+    }
+
+    protected function _log($logMessage, $logType = Zend_Log::INFO)
+    {
+        if ($this->_getLogger()) {
+            $this->_logger->log($logMessage, $logType);
+        }
+    }
+}

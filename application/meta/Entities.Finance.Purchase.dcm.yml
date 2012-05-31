@@ -1,0 +1,47 @@
+# Entities.Finance.Purchase.dcm.yml
+Entities\Finance\Purchase:
+    type: entity
+    table: purchase
+    id:
+        purchase_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        purchase_total:
+            type: decimal
+        purchase_merchantname:
+            type: string
+            length: 127
+        purchase_points:
+            type: integer
+        created_at:
+            type: datetime
+        modified_at:
+            type: datetime
+    manyToOne:
+        card:
+            targetEntity: Entities\Wallet\Card
+            joinColumn:
+                name: purchase_cardid
+                referencedColumnName: card_id
+        merchant_code:
+            targetEntity: Entities\Finance\MerchantCode
+            joinColumn:
+                name: purchase_merchantcodeid
+                referencedColumnName: merchantcode_id        
+        user:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: created_by
+                referencedColumnName: user_id
+        created_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: created_by
+                referencedColumnName: user_id
+        modified_by:
+            targetEntity: Entities\User\User
+            joinColumn:
+                name: modified_by
+                referencedColumnName: user_id

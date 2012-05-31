@@ -1,0 +1,179 @@
+<?php
+
+class Kevlar_Util_Hash
+{
+	const HASH_TIMEOUT_ATTRIB = 'hashTimeout';
+	const HASH_TIMEOUT_CONFIG_ITEM_ATTRIB = 'hashTimeoutConfigItem';
+	const DEFAULT_HASH_ELEMENT_NAME = 'antiCsrfHash';
+	const HASH_ELEMENT_NAME_ATTRIB = 'hashName';
+	const VALIDATOR_MESSAGES_ATTRIB = 'hashValidatorMessages';
+
+	/**
+	 *  Create a hash with a timeout from a config setting based on
+	 *  the $name, with a salt from timeofday.  The salt probably
+	 *  doesn't matter much, since a couple of random numbers are used
+	 *  in making the hash anyway.
+	 *
+	 *  @param $hashName - The name of the hash as a form element.
+	 *
+	 *  @param $configItem - The $configItem is used to look up the hash's
+	 *  timeout.  If the timeout is 0, or not set, we don't create a
+	 *  hash and return null.
+	 */
+	protected static function createHash($hashName, $timeout)
+	{
+		$hash = null;
+		if ($timeout > 0) {
+			require_once 'Zend/Form/Element/Hash.php';
+			$hash = new Zend_Form_Element_Hash($hashName,
+											   array('decorators' => array('ViewHelper'),
+													 'salt' => gettimeofday(),
+													 'timeout' => $timeout)
+											   );
+		}
+		return $hash;		
+	}
+
+
+	/**
+	 *  Add a hash element to a form, based on the form's attributes.
+	 *
+	 *  <ul>
+	 *
+	 *     <li> By default the hash's timeout is the session timeout.
+	 *          <ul>
+	 *             <li> If the form has a HASH_TIMEOUT_ATTRIB
+	 *             attribute, then that is used as the timeout. </li>
+	 *             <li> Otherwise if the form has a
+	 *             HASH_TIMEOUT_CONFIG_ITEM_ATTRIB attribute, and that
+	 *             configuration item is set, then we use the value of the
+	 *             config setting 'form.hashtimeout.' . <attrib value>. </li>
+	 *             <li> Otherwise if the configuration item
+	 *             'form.hashtimeout.' . get_class($form) 
+	 *             is set, we use that as the timeout. </li>
+	 *          </ul>
+	 *          An exception is thrown if the value that should be
+	 *          used as the timeout is not an integer string. </li>
+	 *
+	 *     <li> If the hash timeout is 0, no hash will be added. </li>
+	 *
+	 *     <li> By default, the name of the hash element is
+	 *          DEFAULT_HASH_ELEMENT_NAME . get_class($form).  But if
+	 *          the form has a HASH_ELEMENT_NAME_ATTRIB attribute,
+	 *          that value is used instead. </li>
+	 *
+	 *     <li> The constructor sets validator error messages "not
+	 *     same" and "missing" to values in the form attribute
+	 *     VALIDATOR_MESSAGES_ATTRIB or, if there is no such
+	 *     attribute, to values in the configuration settings
+	 *     form.hash_error_messages.notSame and
+	 *     form.hash_error_messages.missingToken.  </li>
+	 *     
+	 *  </ul>
+	 */
+	public static function checkAddHashToForm($form)
+	{
+		$hashTimeout = self::getHashTimeout($form);
+		if ($hashTimeout != 0) {
+			$hashElementName = self::getHashElementName($form);
+			$hash = self::createHash($hashElementName, $hashTimeout);
+			$hash->removeDecorator('Label');// remove label so hidden attribute does not take space
+			self::setValidatorMessages($hash, $form);
+			$form->addElement($hash);
+			return $hash;
+		} else {
+			return null;
+		}
+	}
+
+	/**
+	 *  Set the message templates for the "Identical" validator that
+	 *  the hash is using, from a form attribute if there is one,
+	 *  otherwise using configured defaults, if they exist, otherwise
+	 *  using some reasonable defaults.
+	 */
+	protected static function setValidatorMessages($hash, $form)
+	{
+		$validator = $hash->getValidator('Identical');
+		$validatorMessages
+			= $form->getAttrib(self::VALIDATOR_MESSAGES_ATTRIB);
+		if ($validatorMessages != null) {
+			$validator->setMessages($validatorMessages);
+		} else {
+			$config = self::getConfig();
+			$validatorMessages
+				= array(
+						Zend_Validate_Identical::NOT_SAME => $config->form->hash_error_messages->notSame,
+						Zend_Validate_Identical::MISSING_TOKEN => $config->form->hash_error_messages->missingToken
+						);
+			$validator->setMessages($validatorMessages);
+		}
+	}
+
+	/**
+	 *  Get the hash timeout for $form following the method given in
+	 *  the doc comment for checkAddHashToForm.
+	 */
+	protected static function getHashTimeout($form)
+	{
+		$hashTimeoutAttrib = $form->getAttrib(self::HASH_TIMEOUT_ATTRIB);
+		if ($hashTimeoutAttrib != null) {
+			if (is_numeric($hashTimeoutAttrib)) {
+				$hashTimeout = (int) $hashTimeoutAttrib;
+			} else {
+				throw new Exception("Hash timeout attribute value '$hashTimeoutAttrib' is not numeric.");
+			}
+		} else {
+			$hashTimeoutConfigItem = 
+				$form->getAttrib(self::HASH_TIMEOUT_CONFIG_ITEM_ATTRIB);
+			if ($hashTimeoutConfigItem == null) {
+				$hashTimeoutConfigItem = get_class($form);
+			}
+			$config = self::getConfig();
+			$hashTimeoutConfig =
+				(!isset($config->form) || $config->form->hashtimeout == 0)
+				? null
+				: $config->form->hashtimeout->get($hashTimeoutConfigItem);
+
+			if ($hashTimeoutConfig === null) {
+				$hashTimeout = $config->session->remember_me_seconds;
+			} else {
+				if (is_numeric($hashTimeoutConfig)) {
+					$hashTimeout = (int) $hashTimeoutConfig;
+				} else {
+					throw new Exception("Value '$hashTimeoutConfig' " .
+										"of configuration item " .
+										"'form.hashtimeout.$hashTimeoutConfigItem' " .
+										" is not numeric.");
+				}
+			}
+		}
+		return $hashTimeout;
+	}
+
+	/**
+	 *  Get the hash element name for $form following the method given in the
+	 *  doc comment for checkAddHashToForm.
+	 */
+	public static function getHashElementName($form)
+	{
+		$hashNameAttrib = $form->getAttrib(self::HASH_ELEMENT_NAME_ATTRIB);
+
+		return $hashNameAttrib == null
+			? self::DEFAULT_HASH_ELEMENT_NAME . '_' . get_class($form)
+			: $hashNameAttrib;
+	}
+
+	protected static $_config = null;
+	public static function getConfig()
+	{
+		if (self::$_config === null) {
+			require_once 'Zend/Config/Ini.php';
+			self::$_config = new Zend_Config_Ini(APPLICATION_PATH .
+										   '/configs/application.ini',
+										   APPLICATION_ENV);
+		}
+		return self::$_config;
+	}
+
+}

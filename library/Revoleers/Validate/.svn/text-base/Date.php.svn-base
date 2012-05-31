@@ -1,0 +1,128 @@
+<?php
+class Kevlar_Validate_Date extends Zend_Validate_Abstract
+{
+    const KEY_MONTH = 'month';
+    const KEY_YEAR  = 'year';
+    
+    const NULL_MONTH = '00';
+    const NULL_YEAR  = '0000';
+    const NULL_DATE  = '000000';
+    
+    const DATE_PATTERN = 'MMYYYY';
+    
+    const MSG_INVALID_DATE   = 'notValidDate';
+    const MSG_INVALID_START  = 'notValidStartDate';
+    const MSG_INVALID_END    = 'notValidEndDate';
+    const MSG_INVALID_PERIOD = 'notValidDatePeriod';
+    
+    /**
+     * Validation failure message template definitions
+     *
+     * @var array
+     */
+    protected $_messageTemplates = array(
+        self::MSG_INVALID_DATE   => "%value%: If Date month is entered, year must be entered.",
+        self::MSG_INVALID_START  => "Start Date: If Date month is entered, year must be entered.",
+        self::MSG_INVALID_END    => "End Date: If Date month is entered, year must be entered.",
+        self::MSG_INVALID_PERIOD => "Start Date cannot be later than End Date."
+    );
+    
+    /**
+     * Error message label
+     * @var string
+     */
+    protected $_label = '';
+    
+    /**
+     * Defined by Zend_Validate_Interface
+     *
+     * Returns true if both month and year are entered or null strings.
+     *
+     * @param  array $value
+     * @return boolean
+     */
+    public function isValid($value)
+    {
+        if ($value[self::KEY_MONTH] != self::NULL_MONTH 
+            && $value[self::KEY_YEAR] == self::NULL_YEAR) 
+        {
+            $label = $this->getLabel();
+            
+            if (preg_match('/Start/', $label)) {
+	    	    $this->_error(self::MSG_INVALID_START, $label);
+            } elseif (preg_match('/End/', $label)) {
+                $this->_error(self::MSG_INVALID_END, $label);
+            } else {
+                $this->_error(self::MSG_INVALID_DATE, $label);
+            }
+            
+	    	return false;
+	    }
+	    
+	    return true;
+    }
+    
+    /**
+     * Returns true if and only if both start and end dates are valid.
+     *
+     * @param  string $startMonth MM
+     * @param  string $startYear  YYYY
+     * @param  string $endMonth	  MM
+     * @param  string $endYear	  YYYY
+     * @return boolean
+     */
+    public function isValidDates($startMonth, $startYear, $endMonth, $endYear)
+    {
+        $startDate = null;
+        $endDate   = null; 
+        
+        $this->setLabel('Start Date');
+        if ($this->isValid(array(
+            self::KEY_MONTH => $startMonth,
+            self::KEY_YEAR  => $startYear))
+            && $startMonth . $startYear != ''
+            && $startMonth . $startYear != self::NULL_DATE)
+        {
+	    	$startDate = new Zend_Date($startMonth . $startYear, self::DATE_PATTERN);
+	    }
+	    
+	    $this->setLabel('End Date');
+	    if ($this->isValid(array(
+            self::KEY_MONTH => $endMonth,
+            self::KEY_YEAR  => $endYear))
+            && $endMonth . $endYear != ''
+            && $endMonth . $endYear != self::NULL_DATE)
+        {
+	    	$endDate = new Zend_Date($endMonth . $endYear, self::DATE_PATTERN);
+	    }
+	    
+	    if (!is_null($startDate) && !is_null($endDate)) {
+	        if ($startDate->isLater($endDate)) {
+	            $this->_error(self::MSG_INVALID_PERIOD, $startDate);
+	    	    return false;
+	        }
+    	}
+    	return count($this->getErrors()) == 0;
+    }
+    
+	/**
+     * Set error message label
+     *
+     * @param  string $label
+     * @return void
+     */
+    public function setLabel($label)
+    {
+        $this->_label = (string) $label;
+    }
+    
+	/**
+     * Retrieve error message label
+     *
+     * @return string
+     */
+    public function getLabel()
+    {
+        return $this->_label;
+    }
+}

@@ -1,0 +1,13 @@
+<?php
+
+class Kevlar_Social_Janrain_Provider_Google extends Kevlar_Social_Janrain_Provider_Abstract implements Kevlar_Social_Janrain_Provider_Interface
+{
+	CONST USERID = 'googleUserId';
+	
+	public function getUserId()
+	{
+        if ($this->_userid === null) {
+            $this->_userid = $this->_profile[self::USERID];
+        }
+    }
+}

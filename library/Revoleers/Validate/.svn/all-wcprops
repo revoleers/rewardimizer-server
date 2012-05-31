@@ -1,0 +1,71 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/66/PB/trunk/library/Kevlar/Validate
+END
+Phone.php
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/Phone.php
+END
+PasswordConfirmation.php
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/PasswordConfirmation.php
+END
+Date.php
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/Date.php
+END
+Printable.php
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/Printable.php
+END
+State.php
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/State.php
+END
+ZipCodes.php
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/ZipCodes.php
+END
+Title.php
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/Title.php
+END
+Url.php
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/Url.php
+END
+FullName.php
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/!svn/ver/66/PB/trunk/library/Kevlar/Validate/FullName.php
+END
+Address.php
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/Address.php
+END
+Company.php
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/!svn/ver/8/PB/trunk/library/Kevlar/Validate/Company.php
+END

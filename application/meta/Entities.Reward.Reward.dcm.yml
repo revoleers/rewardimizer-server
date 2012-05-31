@@ -1,0 +1,29 @@
+# Entities.Reward.Reward.dcm.yml
+Entities\Reward\Reward:
+    type: entity
+    table: reward
+    id:
+        reward_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:        
+        created_at:
+            type: datetime
+        modified_at:
+            type: datetime
+    oneToOne:
+        user:
+            targetEntity: Entities\User\User
+            mappedBy: card
+    manyToOne:
+        spend_category:
+            targetEntity: Entities\Finance\SpendCategory
+            joinColumn:
+                name: reward_spendcategoryid
+                referencedColumnName: spendcategory_id
+        card:
+            targetEntity: Entities\Wallet\Card
+            joinColumn:
+                name: reward_cardid
+                referencedColumnName: card_id

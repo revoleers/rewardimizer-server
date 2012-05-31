@@ -1,0 +1,459 @@
+<?php
+
+class Revoleers_Session_SaveHandler_Doctrine implements Zend_Session_SaveHandler_Interface
+{
+    const DATA_COLUMN = 'dataColumn';
+    const LIFETIME_COLUMN = 'lifetimeColumn';
+    const MODIFIED_COLUMN = 'modifiedColumn';
+    const PRIMARY_KEY_COLUMN = 'primaryKeyColumn';
+
+    const LIFETIME = 'lifetime';
+    const OVERRIDE_LIFETIME = 'overrideLifetime';
+    const TABLE_NAME = 'tableName';
+    const ENTITY_NAME = 'entityName';
+
+    /**
+	* @var string
+	*/
+    protected $_dataColumn = null;
+    protected $_dataSetFunction = null;
+    protected $_dataGetFunction = null;
+
+    /**
+	* @var string
+	*/
+    protected $_lifetimeColumn = null;
+    protected $_lifetimeSetFunction = null;
+    protected $_lifetimeGetFunction = null;
+
+    /**
+	* @var string
+	*/
+    protected $_modifiedColumn = null;
+    protected $_modifiedSetFunction = null;
+    protected $_modifiedGetFunction = null;
+
+    /**
+	* @var string
+	*/
+    protected $_primaryKeyColumn = null;
+    protected $_primaryKeySetFunction = null;
+    protected $_primaryKeyGetFunction = null;
+
+    /**
+	* @var int
+	*/
+    protected $_lifetime = false;
+
+    /**
+	* @var boolean
+	*/
+    protected $_overrideLifetime = false;
+
+    /**
+	* @var string
+	*/
+    protected $_sessionName = null;
+
+    /**
+	* @var string
+	*/
+    protected $_sessionSavePath = null;
+
+    /**
+	* @var string
+	*/
+    protected $_tableName = null;
+    
+    /**
+    * @var string
+    */
+    protected $_entityName = null;
+    
+    /**
+     * @var /Doctrine/ORM/EntityManager
+     */
+    protected $_em = null;
+
+    /**
+	* Constructor
+	*
+	* @param Zend_Config|array $config
+	* @return void
+	* @throws Zend_Session_SaveHandler_Exception
+	*/
+    public function __construct($config)
+    {
+        if ($config instanceof Zend_Config) {
+            $config = $config->toArray();
+        } elseif (!is_array($config)) {
+            throw new Zend_Session_SaveHandler_Exception('Options must be an instance of Zend_Config or array.');
+        }
+
+        foreach ($config as $key => $value) {
+            do {
+                switch ($key) {
+                    case self::DATA_COLUMN:
+                        $this->_dataColumn = (string) $value;
+                        $this->_dataSetFunction = $this->_getFunction($this->_dataColumn, 'set');
+                        $this->_dataGetFunction = $this->_getFunction($this->_dataColumn, 'get');
+                        break;
+                    case self::LIFETIME_COLUMN:
+                        $this->_lifetimeColumn = (string) $value;
+                        $this->_lifetimeSetFunction = $this->_getFunction($this->_lifetimeColumn, 'set');
+                        $this->_lifetimeGetFunction = $this->_getFunction($this->_lifetimeColumn, 'get');
+                        break;
+                    case self::MODIFIED_COLUMN:
+                        $this->_modifiedColumn = (string) $value;
+                        $this->_modifiedSetFunction = $this->_getFunction($this->_modifiedColumn, 'set');
+                        $this->_modifiedGetFunction = $this->_getFunction($this->_modifiedColumn, 'get');
+                        break;
+                    case self::PRIMARY_KEY_COLUMN:
+                        $this->setPrimaryKeyColumn($value);
+                        $this->_primaryKeySetFunction = $this->_getFunction($this->_primaryKeyColumn, 'set');
+                        $this->_primaryKeyGetFunction = $this->_getFunction($this->_primaryKeyColumn, 'get');
+                        break;
+                    case self::LIFETIME:
+                        $this->setLifetime($value);
+                        break;
+                    case self::OVERRIDE_LIFETIME:
+                        $this->setOverrideLifetime($value);
+                        break;
+                    case self::TABLE_NAME:
+                        $this->setTableName($value);
+                        break;
+                    case self::ENTITY_NAME:
+                        $this->setEntityName($value);
+                        break;
+                    default:
+                        break 2;
+                }
+                unset($config[$key]);
+            } while (false);
+        }
+    }
+
+    /**
+	* Destructor
+	*
+	* @return void
+	*/
+    public function __destruct()
+    {
+        Zend_Session::writeClose();
+    }
+
+    /**
+	* Set session lifetime and optional whether or not the lifetime of an
+	* existing session should be overridden
+	*
+	* $lifetime === false resets lifetime to session.gc_maxlifetime
+	*
+	* @param int $lifetime
+	* @param boolean $overrideLifetime (optional)
+	* @return Revoleers_Session_SaveHandler_Doctrine
+	* @throws Zend_Session_SaveHandler_Exception
+	*/
+    public function setLifetime($lifetime, $overrideLifetime = null)
+    {
+        if ($lifetime < 0) {
+            throw new Zend_Session_SaveHandler_Exception('Session lifetime must be greater than zero.');
+        } else if (empty($lifetime)) {
+            $this->_lifetime = (int) ini_get('session.gc_maxlifetime');
+        } else {
+            $this->_lifetime = (int) $lifetime;
+        }
+
+        if ($overrideLifetime != null) {
+            $this->setOverrideLifetime($overrideLifetime);
+        }
+
+        return $this;
+    }
+
+    /**
+	* Retrieve session lifetime
+	*
+	* @return int
+	*/
+    public function getLifetime()
+    {
+        return $this->_lifetime;
+    }
+
+    /**
+	* Set whether or not the lifetime of an existing session should be
+	* overridden
+	*
+	* @param boolean $overrideLifetime
+	* @return Revoleers_Session_SaveHandler_Doctrine
+	*/
+    public function setOverrideLifetime($overrideLifetime)
+    {
+        $this->_overrideLifetime = (boolean) $overrideLifetime;
+        return $this;
+    }
+
+    /**
+	* Retrieve whether or not the lifetime of an existing session should be
+	* overridden
+	*
+	* @return boolean
+	*/
+    public function getOverrideLifetime()
+    {
+        return $this->_overrideLifetime;
+    }
+
+    /**
+* Set primary key column
+*
+* @param string|array $key
+* @return Revoleers_Session_SaveHandler_Doctrine
+* @throws Zend_Session_SaveHandler_Exception
+*/
+    public function setPrimaryKeyColumn($key = 'id')
+    {
+        if (is_string($key)) {
+            $this->_primaryKeyColumn = $key;
+        } else {
+            throw new Zend_Session_SaveHandler_Exception('Invalid primary key column.');
+        }
+
+        return $this;
+    }
+
+    /**
+* Retrieve primary key column
+*
+* @return array
+*/
+    public function getPrimaryKeyColumn()
+    {
+        return $this->_primaryKeyColumn;
+    }
+
+    /**
+	* Set session table name
+	*
+	* @param string $name
+	* @return Revoleers_Session_SaveHandler_Doctrine
+	*/
+    public function setTableName($name = 'Session')
+    {
+        $this->_tableName = $name;
+        return $this;
+    }
+
+    /**
+	* Retrieve session table name
+	*
+	* @return string
+	*/
+    public function getTableName()
+    {
+        return $this->_tableName;
+    }
+    
+    /**
+    * Set session entity name
+    *
+    * @param string $name
+    * @return Revoleers_Session_SaveHandler_Doctrine
+    */
+    public function setEntityName($name = 'Entity/System/Session')
+    {
+        $this->_entityName = $name;
+        return $this;
+    }
+
+    /**
+    * Retrieve session entity name
+    *
+    * @return string
+    */
+    public function getEntityName()
+    {
+        return $this->_entityName;
+    }
+    
+    protected function setEntityManager()
+    {
+    	if ($this->_em === null)
+    	{
+    		$this->_em = Zend_Controller_Front::getInstance()
+                ->getParam('bootstrap')
+                ->getResource('doctrine'); 
+    	}
+    }
+
+    /**
+	* Open Session
+	*
+	* @param string $savePath
+	* @param string $name
+	* @return boolean
+	*/
+    public function open($savePath, $name)
+    {
+        $this->_sessionSavePath = $savePath;
+        $this->_sessionName = $name;
+        return true;
+    }
+
+    /**
+	* Close session
+	*
+	* @return boolean
+	*/
+    public function close()
+    {
+        return true;
+    }
+
+    /**
+	* Read session data
+	*
+	* @param string $id Session identifier
+	* @return string Session data
+	*/
+    public function read($id)
+    {
+        $return = '';
+        $this->setEntityManager();
+        
+        $record = $this->_em->find($this->_entityName, $id);
+        if (null !== $record) {
+            if ($this->_getExpirationTime($record) > time()) {
+                $return = $record->{$this->_dataGetFunction}();
+            } else {
+                $this->destroy($id);
+            }
+        }
+
+        return $return;
+    }
+
+    /**
+	* Write session data
+	*
+	* @param string $id
+	* @param string $data
+	* @return boolean
+	*/
+    public function write($id, $data)
+    {
+    	$return = false;
+    	
+        try {
+	        $this->setEntityManager();
+	        
+            if ($this->_em->isOpen() === false) {
+                return false;
+            }
+	        
+	        $session = $this->_em->find($this->_entityName, $id);
+	        if (null === $session) {
+	            $session = new $this->_entityName;
+	            $session->{$this->_primaryKeySetFunction}($id);
+	        }
+	
+	        $session->{$this->_dataSetFunction}($data);
+	        $session->{$this->_lifetimeSetFunction}($this->_lifetime);
+	        $session->{$this->_modifiedSetFunction}(time());
+        
+	        $this->_em->persist($session);
+	        $this->_em->flush();
+	        
+	        return true;
+        } catch (Exception $ex) {
+            print_r($ex->getMessage());
+        	print_r($ex->getTraceAsString());
+        	return $return;
+        }
+    }
+
+    /**
+	* Destroy session
+	*
+	* @param string $id
+	* @return boolean
+	*/
+    public function destroy($id)
+    {
+        $return = false;
+        $this->setEntityManager();
+
+        $record = $this->_em->find($this->_entityName, $id);
+        if (null !== $record) {
+        	$this->_em->remove($record);
+        	$this->_em->flush();
+        	return true;
+        }
+
+        return $return;
+    }
+
+    /**
+	* Garbage Collection
+	*
+	* @param int $maxlifetime
+	* @return true
+	*/
+    public function gc($maxlifetime)
+    {    	
+        $this->setEntityManager();
+        
+        $sessions = $this->_em->getRepository($this->_entityName)->findAll();
+        foreach ($sessions as $session) {
+            $expiration = $session->{$this->_modifiedGetFunction}() +
+                $session->{$this->_lifetimeGetFunction}();
+            if ($expiration < time()) {
+                $this->_em->remove($session);
+            }
+        }
+        $this->_em->flush();
+        return true;
+    }
+
+    /**
+	* Retrieve session lifetime
+	*
+	* @param entity $record
+	* @return int
+	*/
+    protected function _getLifetime($record)
+    {
+        $return = $this->_lifetime;
+
+        if (!$this->_overrideLifetime) {
+            $return = (int) $record->{$this->_lifetimeGetFunction}();
+        }
+
+        return $return;
+    }
+
+    /**
+	* Retrieve session expiration time
+	*
+	* @param entity $record
+	* @return int
+	*/
+    protected function _getExpirationTime($record)
+    {
+        return (int) $record->{$this->_modifiedGetFunction}() +
+            $this->_getLifetime($record);
+    }
+    
+    protected function _getFunction($column, $type) {
+    	$name = $type;
+    	
+    	$arr = explode('_', $column);
+    	
+    	foreach ($arr as $part) {
+    		$name .= ucfirst($part);
+    	}
+    	
+    	return $name;
+    }
+}

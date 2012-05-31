@@ -1,0 +1,14 @@
+<?php
+
+class Kevlar_Application_Resource_Navigation extends Zend_Application_Resource_ResourceAbstract
+{
+    public function init()
+    {
+    	$this->getBootstrap()->bootstrap('layout');
+    	$view = $this->getBootstrap()->getResource('layout')->getView();
+    	$config = new Zend_Config_Xml(APPLICATION_PATH.'/configs/navigation.xml');
+    	
+    	$navigation = new Zend_Navigation($config);
+    	$view->navigation($navigation);      
+    }
+}

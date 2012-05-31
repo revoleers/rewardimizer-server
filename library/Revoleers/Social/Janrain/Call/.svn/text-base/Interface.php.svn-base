@@ -1,0 +1,6 @@
+<?php
+
+interface Kevlar_Social_Janrain_Call_Interface
+{
+	public function getResponse ();
+}

@@ -1,0 +1,12 @@
+<?php
+
+class Revoleers_Util_Date
+{
+	public static function checkDateConstraint($dateTime, $limit) {
+		$dateStr = $dateTime->format('Y-m-d H:i:s');
+		$date = new Zend_Date($dateStr, 'yyyy-MM-dd HH:mm:ss');
+		$now = new Zend_Date();
+		$date->add($limit, Zend_Date::DAY);
+		return $date->isLater($now);
+	}
+}

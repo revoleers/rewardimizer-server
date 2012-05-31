@@ -1,0 +1,17 @@
+# Entities.Wallet.CardType.dcm.yml
+Entities\Wallet\CardType:
+    type: entity
+    table: cardtype
+    id:
+        cardtype_id:
+            type: integer
+            generator:
+                strategy: AUTO
+    fields:
+        cardtype_name:
+            type: string
+            length: 31
+    oneToMany:
+        cards:
+            targetEntity: Card
+            mappedBy: type

@@ -1,0 +1,35 @@
+<?php
+
+/**
+ *  A simple way to get information about the URL of the present request.
+ */
+class Kevlar_Util_HttpPath
+{
+	public static function getServerUrl()
+	{
+		return (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS']
+				? 'https://' : 'http://')
+		. $_SERVER['SERVER_NAME']
+		. ($_SERVER['SERVER_PORT'] != '80' ? (':' . $_SERVER['SERVER_PORT']) : '');
+	}
+
+	public static function getServerBasePathUrl()
+	{
+		return self::getServerUrl() . self::getRequest()->getBasePath();
+	}
+
+ 	public static function getPageAbsUrl()
+ 	{
+		return self::getServerBasePathUrl() . self::getRequest()->getPathInfo();
+ 	}
+
+	protected static $_request = null;
+	protected static function getRequest()
+	{
+		if (self::$_request === null) {
+			require_once 'Zend/Controller/Front.php';
+			self::$_request = Zend_Controller_Front::getInstance()->getRequest();
+		}
+		return self::$_request;
+	}
+}
